@@ -94,18 +94,21 @@ class VerifyRegisterRequest(BaseModel):
     email: str
     otp: str
 
-# Brevo API config
+# Email config - SMTP for local, Brevo HTTP for Render
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
 EMAIL_FROM = "ashutoshknp12@gmail.com"
 EMAIL_FROM_NAME = "Auth System"
+
+# Gmail SMTP for local testing
+SMTP_HOST = "smtp.gmail.com"
+SMTP_PORT = 465
+SMTP_USER = "ashutoshknp12@gmail.com"
+SMTP_PASS = "jexv miua iqsr snvk"
 
 def generate_otp():
     return ''.join(random.choices(string.digits, k=6))
 
 def send_otp_email(to_email, otp_code, purpose):
-    import urllib.request
-    import json
-
     if purpose == "register":
         subject = "Verify Your Account"
     elif purpose == "forgot_password":
@@ -114,26 +117,43 @@ def send_otp_email(to_email, otp_code, purpose):
         subject = "Your OTP Code"
 
     html = f"<p>Your OTP code is: <strong>{otp_code}</strong></p><p>It expires in 5 minutes.</p>"
+    body = f"Your OTP code is: {otp_code}\nIt expires in 5 minutes."
 
-    payload = json.dumps({
-        "sender": {"name": EMAIL_FROM_NAME, "email": EMAIL_FROM},
-        "to": [{"email": to_email}],
-        "subject": subject,
-        "htmlContent": html
-    }).encode()
+    # Try Brevo HTTP API first (Render), fallback to SMTP (local)
+    if BREVO_API_KEY:
+        try:
+            import urllib.request
+            import json
+            payload = json.dumps({
+                "sender": {"name": EMAIL_FROM_NAME, "email": EMAIL_FROM},
+                "to": [{"email": to_email}],
+                "subject": subject,
+                "htmlContent": html
+            }).encode()
+            req = urllib.request.Request(
+                "https://api.brevo.com/v3/smtp/email",
+                data=payload,
+                headers={"api-key": BREVO_API_KEY, "Content-Type": "application/json"}
+            )
+            urllib.request.urlopen(req, timeout=10)
+            logger.info(f"OTP email sent to {to_email} via Brevo")
+            return True
+        except Exception as e:
+            logger.error(f"Brevo failed: {e}, trying SMTP")
 
-    req = urllib.request.Request(
-        "https://api.brevo.com/v3/smtp/email",
-        data=payload,
-        headers={
-            "api-key": BREVO_API_KEY,
-            "Content-Type": "application/json"
-        }
-    )
-
+    # SMTP fallback (local)
     try:
-        urllib.request.urlopen(req, timeout=10)
-        logger.info(f"OTP email sent to {to_email}")
+        import smtplib
+        from email.mime.text import MIMEText
+        msg = MIMEText(body)
+        msg["Subject"] = subject
+        msg["From"] = EMAIL_FROM
+        msg["To"] = to_email
+        server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10)
+        server.login(SMTP_USER, SMTP_PASS)
+        server.sendmail(EMAIL_FROM, to_email, msg.as_string())
+        server.quit()
+        logger.info(f"OTP email sent to {to_email} via SMTP")
         return True
     except Exception as e:
         logger.error(f"Failed to send OTP email to {to_email}: {e}")
