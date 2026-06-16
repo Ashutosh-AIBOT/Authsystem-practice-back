@@ -17,6 +17,7 @@ import logging
 from email.mime.text import MIMEText
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 # Use /app/data in Docker, ./data locally
 DB_DIR = os.environ.get("DB_DIR", "./data")
@@ -25,7 +26,7 @@ DATABASE_URL = f"sqlite:///{os.path.join(DB_DIR, 'users.db')}"
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "mysecretkey123")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = "30"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine)
@@ -146,7 +147,7 @@ def create_otp(db, email, purpose):
     return code
 
 def hash_password(password):
-    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=4)).decode()
 
 def verify_password(plain, hashed):
     return bcrypt.checkpw(plain.encode(), hashed.encode())
@@ -154,7 +155,7 @@ def verify_password(plain, hashed):
 def create_access_token(data):
     to_encode = data.copy()
     to_encode["sub"] = str(to_encode["sub"])
-    to_encode["exp"] = datetime.utcnow() + timedelta(minutes=int(ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode["exp"] = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode["type"] = "access"
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
