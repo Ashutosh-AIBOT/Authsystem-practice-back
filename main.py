@@ -13,7 +13,10 @@ import smtplib
 import random
 import string
 import threading
+import logging
 from email.mime.text import MIMEText
+
+logger = logging.getLogger(__name__)
 
 # Use /app/data in Docker, ./data locally
 DB_DIR = os.environ.get("DB_DIR", "./data")
@@ -115,14 +118,20 @@ def send_otp_email(to_email, otp_code, purpose):
     msg["From"] = SMTP_SENDER
     msg["To"] = to_email
     try:
-        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
+        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10)
         server.starttls()
         server.login(SMTP_USER, SMTP_PASS)
         server.sendmail(SMTP_SENDER, to_email, msg.as_string())
         server.quit()
+        logger.info(f"OTP email sent to {to_email}")
         return True
-    except Exception:
+    except Exception as e:
+        logger.error(f"Failed to send OTP email to {to_email}: {e}")
         return False
+
+def send_email_background(to_email, otp_code, purpose):
+    thread = threading.Thread(target=send_otp_email, args=(to_email, otp_code, purpose), daemon=False)
+    thread.start()
 
 def create_otp(db, email, purpose):
     code = generate_otp()
@@ -215,7 +224,7 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     )
     db.add(otp)
     db.commit()
-    threading.Thread(target=send_otp_email, args=(req.email, code, "register")).start()
+    send_email_background(req.email, code, "register")
     return {"message": "OTP sent to email. Verify to activate account."}
 
 @app.post("/auth/register/verify")
@@ -353,7 +362,7 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(404, "Email not found")
     code = create_otp(db, req.email, "forgot_password")
-    threading.Thread(target=send_otp_email, args=(req.email, code, "forgot_password")).start()
+    send_email_background(req.email, code, "forgot_password")
     return {"message": "OTP sent to email"}
 
 @app.post("/auth/forgot-password/verify")
