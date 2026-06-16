@@ -240,7 +240,7 @@ def register_verify(req: VerifyRegisterRequest, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Account verified. You can now login."}
 
-@app.post("/auth/login", response_model=TokenResponse)
+@app.post("/auth/login")
 def login(req: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(
         (User.username == req.username) | (User.email == req.username)
@@ -251,7 +251,8 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(401, "Account not verified. Check your email for OTP.")
     return {
         "access_token": create_access_token({"sub": user.id}),
-        "refresh_token": create_refresh_token({"sub": user.id})
+        "refresh_token": create_refresh_token({"sub": user.id}),
+        "user": {"id": user.id, "username": user.username, "email": user.email}
     }
 
 @app.get("/me")
