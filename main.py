@@ -1,9 +1,4 @@
-import bcrypt as _bcrypt
-if not hasattr(_bcrypt, "__about__"):
-    class _BcryptAbout:
-        __version__ = _bcrypt.__version__
-    _bcrypt.__about__ = _BcryptAbout()
-
+import bcrypt
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
@@ -12,7 +7,6 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel, Field, validator
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime
 from sqlalchemy.orm import sessionmaker, Session, DeclarativeBase
-from passlib.context import CryptContext
 import os
 import re
 import smtplib
@@ -97,8 +91,6 @@ class VerifyRegisterRequest(BaseModel):
     email: str
     otp: str
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 # Hardcoded SMTP config
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
@@ -144,10 +136,10 @@ def create_otp(db, email, purpose):
     return code
 
 def hash_password(password):
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 def verify_password(plain, hashed):
-    return pwd_context.verify(plain, hashed)
+    return bcrypt.checkpw(plain.encode(), hashed.encode())
 
 def create_access_token(data):
     to_encode = data.copy()
