@@ -9,12 +9,10 @@ from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime
 from sqlalchemy.orm import sessionmaker, Session, DeclarativeBase
 import os
 import re
-import smtplib
 import random
 import string
 import threading
 import logging
-from email.mime.text import MIMEText
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -96,33 +94,45 @@ class VerifyRegisterRequest(BaseModel):
     email: str
     otp: str
 
-# Hardcoded SMTP config
-SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = 465
-SMTP_USER = "ashutoshknp12@gmail.com"
-SMTP_PASS = "jexv miua iqsr snvk"
-SMTP_SENDER = "ashutoshknp12@gmail.com"
+# Brevo API config
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
+EMAIL_FROM = "ashutoshknp12@gmail.com"
+EMAIL_FROM_NAME = "Auth System"
 
 def generate_otp():
     return ''.join(random.choices(string.digits, k=6))
 
 def send_otp_email(to_email, otp_code, purpose):
+    import urllib.request
+    import json
+
     if purpose == "register":
         subject = "Verify Your Account"
     elif purpose == "forgot_password":
         subject = "Password Reset Code"
     else:
         subject = "Your OTP Code"
-    body = f"Your OTP code is: {otp_code}\nIt expires in 5 minutes."
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = SMTP_SENDER
-    msg["To"] = to_email
+
+    html = f"<p>Your OTP code is: <strong>{otp_code}</strong></p><p>It expires in 5 minutes.</p>"
+
+    payload = json.dumps({
+        "sender": {"name": EMAIL_FROM_NAME, "email": EMAIL_FROM},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": html
+    }).encode()
+
+    req = urllib.request.Request(
+        "https://api.brevo.com/v3/smtp/email",
+        data=payload,
+        headers={
+            "api-key": BREVO_API_KEY,
+            "Content-Type": "application/json"
+        }
+    )
+
     try:
-        server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10)
-        server.login(SMTP_USER, SMTP_PASS)
-        server.sendmail(SMTP_SENDER, to_email, msg.as_string())
-        server.quit()
+        urllib.request.urlopen(req, timeout=10)
         logger.info(f"OTP email sent to {to_email}")
         return True
     except Exception as e:
