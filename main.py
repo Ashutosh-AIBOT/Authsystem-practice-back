@@ -1,3 +1,9 @@
+import bcrypt as _bcrypt
+if not hasattr(_bcrypt, "__about__"):
+    class _BcryptAbout:
+        __version__ = _bcrypt.__version__
+    _bcrypt.__about__ = _BcryptAbout()
+
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
