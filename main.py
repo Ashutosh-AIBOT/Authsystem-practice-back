@@ -98,7 +98,7 @@ class VerifyRegisterRequest(BaseModel):
 
 # Hardcoded SMTP config
 SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = 587
+SMTP_PORT = 465
 SMTP_USER = "ashutoshknp12@gmail.com"
 SMTP_PASS = "jexv miua iqsr snvk"
 SMTP_SENDER = "ashutoshknp12@gmail.com"
@@ -119,8 +119,7 @@ def send_otp_email(to_email, otp_code, purpose):
     msg["From"] = SMTP_SENDER
     msg["To"] = to_email
     try:
-        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10)
-        server.starttls()
+        server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10)
         server.login(SMTP_USER, SMTP_PASS)
         server.sendmail(SMTP_SENDER, to_email, msg.as_string())
         server.quit()
