@@ -12,6 +12,7 @@ import re
 import smtplib
 import random
 import string
+import threading
 from email.mime.text import MIMEText
 
 # Use /app/data in Docker, ./data locally
@@ -214,7 +215,7 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     )
     db.add(otp)
     db.commit()
-    send_otp_email(req.email, code, "register")
+    threading.Thread(target=send_otp_email, args=(req.email, code, "register")).start()
     return {"message": "OTP sent to email. Verify to activate account."}
 
 @app.post("/auth/register/verify")
@@ -352,7 +353,7 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(404, "Email not found")
     code = create_otp(db, req.email, "forgot_password")
-    send_otp_email(req.email, code, "forgot_password")
+    threading.Thread(target=send_otp_email, args=(req.email, code, "forgot_password")).start()
     return {"message": "OTP sent to email"}
 
 @app.post("/auth/forgot-password/verify")
